@@ -9,28 +9,65 @@ delta_t = 0.01  # fs
 n = int((width/delta_x))  # number of steps
 
 
-def array_populator(size):
-    np.zeros((size, size))
+# The potential function V is defined for all time. (Taken to be constant)
+# for now, so we will not need to worry about passing A any time information.
+# 
+
+# B requires the solutions from our previous matrix. The best bet seems to
+# be saving the previous solution vector and simply tell B which "i" is
+# required, and then just index out from the previous solutions.
+
+def A(diagCount):
+    i = diagCount
+    Ai = -2 + ((4*i*m*delta_x**2)/(h_bar*delta_t)) - ((2*m*delta_x**2)/(h_bar)) # times potential function
+    return (Ai)
+    
+def Bi(solutions,row):
+    i = row
+    psi_iplus = solutions[i+1]
+    psi_iminus = solutions[i-1]
+    psi_i = solutions[i]
+    pass
+
+
+def array_populator(size,solutions):
+    M = np.zeros((size, size))
+    B = np.zeroes((size,))
     diagCounter = 0
+
+
+    # i and j should start from 1
 
     for i in range(size):
         for j in range(size):
 
             if i == j:  # on the diagonal
                 diagCounter += 1
+                M[i,j] = A(diagCounter)
 
             elif i == (diagCounter + 1) and (j == diagCounter):
+                M[i,j] = 1
         # assign value based on A_i
             elif (i == diagCounter) and j == (diagCounter + 1):
+                M[i,j] = 1
         # assign value based on A_i
 
-        if i == 1:
+
+
+        if i == 0:
+            B[i] # = function of psi
+            # ask about zero index
             # assign boundary value
-        elif (i > 1) and (i < n):
+
+        if (i > 0) and (i < n):
+            B[i] = Bi(solutions,i)
             # assign values based on B_n
+
         elif i == n:
+            pass
             # assign other boundary value
 
     # return matrix and vector
 
 for t in range(n):  # time iteration loop
+    pass
