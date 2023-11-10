@@ -2,7 +2,7 @@ import numpy as np
 
 m = 5.68  # special boy units
 h_bar = 0.06582  # eV * fs
-
+c = 300 # nm/fs
 width = 1  # nm
 delta_x = 0.01  # nm
 delta_t = 0.01  # fs
