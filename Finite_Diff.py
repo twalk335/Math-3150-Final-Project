@@ -19,7 +19,9 @@ n = int((width/delta_x))  # number of steps
 
 def A(diagCount):
     i = diagCount
+
     Ai = -2 + ((4*i*m*delta_x**2)/(h_bar*delta_t)) - ((2*m*delta_x**2)/(h_bar)) # times potential function at n + 1
+
     return (Ai)
     
 def Bi(solutions,row):
@@ -27,8 +29,10 @@ def Bi(solutions,row):
     psi_iplus = solutions[i+1]
     psi_iminus = solutions[i-1]
     psi_i = solutions[i]
+
     B = -psi_iplus - psi_iminus + psi_i * (2+((4*i*m*delta_x**2)/(h_bar*delta_t))+((2*m*delta_x**2)/(h_bar**2))) # Times potential at previous time)
     return(B)
+
 
 
 def array_populator(size,solutions):
@@ -55,8 +59,10 @@ def array_populator(size,solutions):
 
 
 
+
         # if i == 0:
          # = function of psi
+
             # ask about zero index
             # assign boundary value
 
@@ -71,4 +77,6 @@ def array_populator(size,solutions):
     # return matrix and vector
 
 for t in range(n):  # time iteration loop
+
     pass
+
