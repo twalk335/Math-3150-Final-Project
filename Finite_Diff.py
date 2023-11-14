@@ -81,32 +81,40 @@ def array_populator(size, solutions):
     return M, B
 
 
-domain = np.linspace(0, width, n)
+def initial_conditions(x, x0, sigma):
+    i = np.imag(1j)
+    p0 = np.sqrt(2) * m * c
+    A = 1/(np.pi**(1/4) * np.sqrt(sigma))
+    B = -(((x - x0)**2)/(2 * sigma**2))
+    C = (i * p0 * x)/h_bar
 
-psi0 = np.exp(-(domain-0.5)**2)  # n space steps given, this value should be the size passed to the populator function
-normalization_constant = (1/1.2533)  # value that normalizes wave function squared of initial conditions
-psi0_pdf = psi0**2 * normalization_constant  # normalized probability density function for initial conditions
+    output = A * np.exp(B) * np.exp(C)
+    return output
+
+
+def analytical_solution(x, t, x0, sigma):
+    i = np.imag(1j)
+    p0 = np.sqrt(2) * m * c
+    E = m * c**2
+    A = 1/(np.pi**(1/4) * np.sqrt(sigma * (1 + (i * h_bar * t)/(m * sigma**2))))
+    B = (-x - (x0 + (p0 * t)/m)**2)
+    C = 2 * sigma**2 * (1 + (i * h_bar * t)/(m * sigma**2))
+    D = i * (p0 * x - E * t)/h_bar
+
+    output = A * np.exp(B/C) * np.exp(D)
+    return output
+
+
+domain_x = np.linspace(0, width, n)
+domain_t = np.linspace(0, time, t)
+
+# psi0 = np.exp(-(domain_x-0.5)**2)  # n space steps given, this value should be the size passed to the populator function
+# normalization_constant = (1/1.2533)  # value that normalizes wave function squared of initial conditions
+psi0 = initial_conditions(domain_x, -0.5, delta_x)  # sigma ~ delta_x
+# psi0_pdf = psi0**2 * normalization_constant  # normalized probability density function for initial conditions
 
 solution_matrix = np.empty((t, n))  # each new row corresponds to the wave function at a different time
 solution_matrix[0, :] = psi0  # fixed to assign whole row to initial conditions
-
-"""
-plt.subplot(211)
-plt.plot(size, normalization_constant * psi0_pdf)
-
-
-M, B = array_populator(n, psi0)
-solutions = np.linalg.solve(M, B)
-# print(solutions)
-
-
-plt.subplot(212)
-plt.plot(size, np.absolute(solutions))
-
-plt.tight_layout()
-plt.show()
-
-"""
 
 for i in range(t-1):  # time iteration loop
 
@@ -117,15 +125,24 @@ for i in range(t-1):  # time iteration loop
     print(f"Progress: {np.round(i/t * 100, 2)}%")
 
 
+true_solution_matrix = np.zeros((t, n))
+true_solution_matrix[0, :] = initial_conditions(domain_x, -0.5, 0.01)  # x, x0, sigma
+
+for i in range(t - 1):
+    true_solution_matrix[i + 1, :] = analytical_solution(domain_x, domain_t[i], -0.5, 0.1)
+    print(f"2nd Progress: {np.round(i/t * 100, 2)}%")
+
+
 fig, ax = plt.subplots()
 
 
 def update(frame):
     ax.clear()
-    ax.plot(domain, np.absolute(solution_matrix[frame, :])**2)  # plotting magnitude of wave function squared
+    ax.plot(domain_x, np.absolute(solution_matrix[frame, :])**2)  # plotting magnitude of wave function squared
+    ax.plot(domain_x, np.absolute(true_solution_matrix[frame, :])**2)
     ax.set_title(f'Time Step: {frame}')
     ax.set_xlabel('Space')
-    ax.set_ylabel('Function Value')
+    ax.set_ylabel(r"$|\Psi(x,t)|^2$")
 
 
 # Create the animation
@@ -134,5 +151,4 @@ animation = FuncAnimation(fig, update, frames=num_frames, interval=100)
 
 # Display the animation
 plt.show()
-
 
