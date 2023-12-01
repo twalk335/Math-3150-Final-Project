@@ -1,13 +1,8 @@
-# TODO
-# Set the initial conditions properly, (0 on some infinite barrier or something)
-# Set the i = 0 conditions properly as well, right now I believe it's also unconstrained.
-
-
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import animation
 from matplotlib.animation import FuncAnimation
 
+"""
 m = 5.68  # special boy units
 h_bar = 0.6582  # eV * fs
 c = 300  # nm/fs
@@ -15,162 +10,123 @@ width = 1  # nm
 delta_x = 0.005  # nm
 delta_t = 0.1  # fs
 time = 1  # fs
-n = int((width/delta_x))  # number of space steps
-t = int((time/delta_t))  # number of time steps
+"""
 
-# The potential function V is defined for all time. (Taken to be constant)
-# for now, so we will not need to worry about passing A any time information.
-#
+i = np.imag(1j)
+hbar = 2
+m = 2
+x = np.linspace(0, 1, 100)
+dx = x[1]-x[0]
+t = np.linspace(0, 1, 1000)
+dt = t[1]-t[0]
+alpha = (i*dt)/(2*hbar)
+beta = hbar/(2*m)
+A = (alpha * beta) / dx**2
+mode = 5  # number of anti-nodes in psi0
+print(f"Stability Ratio: {dt/dx**2}")
 
-# B requires the solutions from our previous matrix. The best bet seems to
-# be saving the previous solution vector and simply tell B which "i" is
-# required, and then just index out from the previous solutions.
-
-
-def A(diagCount, V):
-
-    i = np.imag(1j)  # fixed by adding complex numbers
-
-    Ai = -2 + ((4*i*m*delta_x**2)/(h_bar*delta_t)) - ((2*m*delta_x**2)/(h_bar**2)) * V[diagCount - 1]
-
-    return Ai
-
-
-def Bi(solutions, row, V):
-
-    i = row  # 'i' is an index here, not an imaginary number
-
-    if i != len(solutions):
-        psi_iplus = solutions[i+1]
-        psi_iminus = solutions[i-1]
-        psi_i = solutions[i]
-    else:
-        psi_iplus = 0
-        psi_iminus = solutions[i-1]
-        psi_i = solutions[i]
-
-    j = np.imag(1j)
-    B = -psi_iplus - psi_iminus + psi_i * (2 + ((4*j*m*delta_x**2)/(h_bar*delta_t)) + ((2*m*delta_x**2)/(h_bar**2)) * V[i])
-    # Times potential at previous time
-
-    return B
+# Terms used in matrix algebra
+Kt = lambda x, ti : (1 + 2*A + Vt(ti)[x] * alpha) / A
+Gt = lambda x, ti : (1 - 2*A - Vt(ti)[x] * alpha) / A
 
 
-def array_populator(size, solutions, V):
+### POTENTIAL FUNCTIONS
+Vt = lambda ti: 1e2 * np.exp(-((x-1+2*ti*1/(len(t)))**2)*100)  # moving gaussian
+# Vt = lambda ti: 1e2 * (x - ti/len(t))**2  # moving harmonic oscillator
+# Vt = lambda ti: 0 * ti * x  # infinite square well
+###
 
-    M = np.zeros((size, size))
-    B = np.zeros(size)
-    diagCounter = 0
 
-    for i in range(size):
-        for j in range(size):
+### INITIAL CONDITIONS
+L = x[-1] - x[0]  # length of box
+psi0 = (np.sqrt(2/L) * np.sin(mode * np.pi/L * x))  # standing wave initial conditions
+psi0 = psi0/np.sqrt(np.sum(psi0**2 * dx))  # normalizing
+###
 
-            if i == j:  # on the diagonal
-                diagCounter += 1
-                M[i, j] = A(diagCounter, V)
+def analytical_solution(x_input, t_input):
 
-            elif (i == diagCounter - 1) and (j == diagCounter):
-                M[i, j] = 1
+    sin_part = np.sqrt(2/L) * np.sin(mode * np.pi/L * x_input)
+    exp_part = np.exp(((-1j * mode**2 * np.pi**2 * hbar)/(2 * m * L**2)) * t_input)
+    return sin_part * exp_part
 
-            elif (i == diagCounter) and j == (diagCounter - 1):
-                M[i, j] = 1
 
-        if (i > 0) and (i < size - 1):
-            B[i] = Bi(solutions, i, V)
+plt.plot(x, psi0**2, label='psi0 for approximation')
+plt.title(f"psi0**2 area under graph: {np.round(np.trapz(psi0**2, x), 3)}")
+plt.plot(x, analytical_solution(x, t[0])**2, 'r.', label='exact psi0')
+plt.legend()
+plt.show()
+
+true_sol_mat = np.empty((len(t), len(x)), dtype=np.complex128)
+for k in range(len(t)):
+    true_sol_mat[k, :] = analytical_solution(x, t[k])
+
+
+def MBarrs(solutions, t=None):
+    diag_count = 0
+
+    M = np.zeros((len(x),len(x)))
+    B = np.zeros((len(x),))
+    for i in range(len(x)):
+        for j in range(len(x)):
+
+            if i == j:
+                # M[i,j] = K (i)
+                M[i, j] = Kt(i, t)
+                diag_count += 1
+
+            elif (i == diag_count - 1) and (j == diag_count):
+                M[i, j] = -1
+
+            elif (i == diag_count) and j == (diag_count - 1):
+                M[i, j] = -1
+        
+        if 1 < i < len(x) - 1:
+            # B[i] = solutions[i] * G(i) + solutions[i+1] + solutions[i-1]
+            B[i] = solutions[i] * Gt(i, t) + solutions[i+1] + solutions[i-1]
+        elif i == 0:
+            B[i] = 0
+        elif i == len(x):
+            B[i] = 0
 
     return M, B
 
 
-"""
-def initial_conditions(x, x0, sigma):
-    i = np.imag(1j)
-    p0 = 0.00001
-    A = 1/(np.pi**(1/4) * np.sqrt(sigma))
-    B = -(((x - x0)**2)/(2 * sigma**2))
-    C = (i * p0 * x)/h_bar
+M1, B1 = MBarrs(psi0, 0)
 
-    output = A * np.exp(B) * np.exp(C)
-    return output
-"""
+V_overtime = np.empty((len(t), len(x)))
 
-"""
-def initial_conditions(x, x0, sigma):
-    output = np.exp(-((x - x0)**2)/(2 * sigma**2))
-    normalization_constant = 1/(sigma * np.sqrt(2 * np.pi))
-    return output * normalization_constant
-"""
+sols = np.linalg.solve(M1, B1)
 
+solution_matrix = np.empty((len(t), len(x)))
+solution_matrix[0, :] = psi0
+solution_matrix[1, :] = sols
 
-def initial_conditions(x, mode):
-    return np.sqrt(2) * np.sin(mode * np.pi * x)
-
-
-def potential(x, mu, sigma):
-    V = 700 * np.exp((-(x - mu)**2)/(2 * sigma**2))
-    return V
-
-
-"""
-def analytical_solution(x, t, x0, sigma):
-    i = np.imag(1j)
-    p0 = 20
-    E = m * c**2
-    A = 1/(np.pi**(1/4) * np.sqrt(sigma * (1 + (i * h_bar * t)/(m * sigma**2))))
-    B = (-(x - (x0 + (p0 * t)/m)**2))
-    C = 2 * sigma**2 * (1 + (i * h_bar * t)/(m * sigma**2))
-    D = i * (p0 * x - E * t)/h_bar
-
-    output = A * np.exp(B/C) * np.exp(D)
-    return output
-"""
-
-domain_x = np.linspace(0, width, n)
-domain_t = np.linspace(0, time, t)
-
-psi0 = initial_conditions(domain_x, 3)
-
-solution_matrix = np.empty((t, n))  # each new row corresponds to the wave function at a different time
-solution_matrix[0, :] = psi0  # fixed to assign whole row to initial conditions
-V_x = potential(domain_x, 0.5, 0.1)
-
-# plt.plot(domain_x, psi0)
-# plt.plot(domain_x, V_x)
-# plt.show()
-for i in range(t-1):  # time iteration loop
-
-    M, B = array_populator(n, solution_matrix[i, :], V_x)
-    psi_n = np.linalg.solve(M, B)
-    psi_n = psi_n/np.sqrt(np.sum(psi_n**2) * delta_x)
-    solution_matrix[i + 1, :] = psi_n
-
-    print(f"Progress: {np.round(i/t * 100, 2)}%")
-
-
-true_solution_matrix = np.zeros((t, n))
-# true_solution_matrix[0, :] = initial_conditions(domain_x, -0.5, 0.01)  # x, x0, sigma
-
-"""
-for i in range(t - 1):
-    true_solution_matrix[i + 1, :] = analytical_solution(domain_x, domain_t[i], -0.5, 0.1)
-    print(f"2nd Progress: {np.round(i/t * 100, 2)}%")
-"""
+for i in range(2, len(t)):
+    if np.mod(i, 40) == 0:
+        print(f"Progress: {np.round(i/len(t) * 100, 3)}%")
+    Mx, Bx = MBarrs(sols, i)
+    sols = np.linalg.solve(Mx, Bx)
+    sols = sols / np.sqrt(np.sum(sols**2 * dx))
+    solution_matrix[i] = sols
+    V_overtime[i] = Vt(i)
 
 fig, ax = plt.subplots()
 
 
 def update(frame):
     ax.clear()
-    ax.plot(domain_x, np.absolute(solution_matrix[frame, :])**2)  # plotting magnitude of wave function squared
-    # ax.plot(domain_x, np.absolute(true_solution_matrix[frame, :])**2)
-    area = np.trapz(np.absolute(solution_matrix[frame, :])**2, domain_x)
-    ax.set_title(f'Area: {area}')
-    ax.set_xlabel('Space')
-    ax.set_ylabel(r"$|\psi(x,t)|^2$")
+    # plotting magnitude of wave function squared
+    ax.plot(x, np.absolute(solution_matrix[frame, :])**2)
+    # ax.plot(x, np.absolute(true_sol_mat[frame, :])**2, 'r.')  # analytical solution for standing wave
+    ax.plot(x, V_overtime[frame, :] * 1/20, 'r-')
+    area = np.trapz(np.absolute(solution_matrix[frame, :])**2, x)
+    ax.set_title(f'Area Under Graph: {np.round(area, 4)}')
+    ax.set_xlabel('Distance')
+    ax.set_ylabel(r"$|\Psi(x,t)|^2$")
+    ax.set_ylim(0, 6)
 
 
 # Create the animation
 num_frames = solution_matrix.shape[0]
-animation = FuncAnimation(fig, update, frames=num_frames, interval=100)
-
-# Display the animation
-plt.show()
+animation = FuncAnimation(fig, update, frames=num_frames, interval=30)
+animation.save("gaussian.gif", writer="Pillow")
